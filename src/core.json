@@ -90,6 +90,12 @@
         }
     ],
     "boards": {
+        "go": {
+            "bitstream": "karabas_go.bin"
+        },
+        "mini": {
+            "bitstream": "karabas_mini.bin"
+        },
         "minig": {
             "bitstream": "karabas_minig.bin"
         }
