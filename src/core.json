@@ -1,0 +1,207 @@
+{
+    "id": "bk",
+    "name": "BK-0011M",
+    "build": "26110701",
+    "visible": true,
+    "type": "osd",
+    "order": 14,
+    "eeprom_bank": 255,
+    "rtc_mode": 1,
+    "roms": [
+        {
+            "filename": "roms/azboot.ROM",
+            "address": 262144
+        },
+        {
+            "filename": "roms/AZLIB00.ROM",
+            "address": 266240
+        },
+        {
+            "filename": "roms/AZLIB01.ROM",
+            "address": 270336
+        },
+        {
+            "filename": "roms/AZLIB02.ROM",
+            "address": 274432
+        },
+        {
+            "filename": "roms/AZLIB03.ROM",
+            "address": 278528
+        },
+        {
+            "filename": "roms/AZ337.ROM",
+            "address": 294912
+        },
+        {
+            "filename": "roms/11M_324.ROM",
+            "address": 327680
+        },
+        {
+            "filename": "roms/11M_325.ROM",
+            "address": 335872
+        },
+        {
+            "filename": "roms/11M_327.ROM",
+            "address": 344064
+        },
+        {
+            "filename": "roms/11M_328.ROM",
+            "address": 352256
+        },
+        {
+            "filename": "roms/11M_329.ROM",
+            "address": 360448
+        },
+        {
+            "filename": "roms/11M_330.ROM",
+            "address": 368640
+        },
+        {
+            "filename": "roms/10_017.ROM",
+            "address": 376832
+        },
+        {
+            "filename": "roms/10_018.ROM",
+            "address": 385024
+        },
+        {
+            "filename": "roms/10_019.ROM",
+            "address": 393216
+        },
+        {
+            "filename": "roms/10_106.ROM",
+            "address": 401408
+        },
+        {
+            "filename": "roms/10_107.ROM",
+            "address": 409600
+        },
+        {
+            "filename": "roms/10_108.ROM",
+            "address": 417792
+        },
+        {
+            "filename": "roms/SETUP.ROM",
+            "address": 491520
+        },
+        {
+            "filename": "roms/AZLOGO.RAW",
+            "address": 131072
+        }
+    ],
+    "boards": {
+        "minig": {
+            "bitstream": "karabas_minig.bin"
+        }
+    },
+    "osd": [
+        {
+            "type": "F",
+            "name": "AZ0",
+            "slot": 0,
+            "exts": [
+                "img",
+                "bkd",
+                "dsk"
+            ],
+            "dir": "/bk",
+            "hotkey": "Menu+F1",
+            "file": "WRKANDOS2.IMG"
+        },
+        {
+            "type": "F",
+            "name": "AZ1",
+            "slot": 1,
+            "exts": [
+                "img",
+                "bkd",
+                "dsk"
+            ],
+            "dir": "/bk",
+            "hotkey": "Menu+F2"
+        },
+        {
+            "type": "F",
+            "name": "AZ2",
+            "slot": 2,
+            "exts": [
+                "img",
+                "bkd",
+                "dsk"
+            ],
+            "dir": "/bk",
+            "hotkey": "Menu+F3"
+        },
+        {
+            "type": "F",
+            "name": "AZ3",
+            "slot": 3,
+            "exts": [
+                "img",
+                "bkd",
+                "dsk"
+            ],
+            "dir": "/bk",
+            "hotkey": "Menu+F4"
+        },
+        {
+            "type": "F",
+            "name": "AZ EEPROM",
+            "slot": 4,
+            "exts": [
+                "dat"
+            ],
+            "dir": "/bk",
+            "file": "eeprom.dat"
+        },
+        {
+            "type": "-"
+        },
+        {
+            "type": "S",
+            "name": "CPU",
+            "options": [
+                "4 MHz",
+                "8 MHz"
+            ],
+            "default": 0,
+            "hotkey": "Menu+C"
+        },
+        {
+            "type": "S",
+            "name": "Joystick",
+            "options": [
+                "Off",
+                "On"
+            ],
+            "default": 1
+        },
+        {
+            "type": "S",
+            "name": "Covox 177714",
+            "key": "covox",
+            "options": [
+                "Off",
+                "AZ setup"
+            ],
+            "default": 0
+        },
+        {
+            "type": "S",
+            "name": "Volume",
+            "options": [
+                "Off",
+                "25 %",
+                "50 %",
+                "100 %"
+            ],
+            "default": 2,
+            "hotkey": "Menu+V"
+        },
+        {
+            "type": "T",
+            "name": "Reset",
+            "hotkey": "Menu+F12"
+        }
+    ]
+}
