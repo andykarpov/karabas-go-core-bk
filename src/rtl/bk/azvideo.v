@@ -469,16 +469,29 @@ end
 // enable go through four registers to be written at the same edge.
 //------------------------------------------------------------------------
 // stage 0: the pixel's word and bit position, per layer
-localparam integer PD = 4;
+localparam integer PD = 5;   // karabas: 4 upstream, one more for the register after the word index
 wire [10:0] px = hcnt + 11'd0;           // the pixel this clock computes
 wire        px_vis = h_active && v_active;
 wire [10:0] sx = px >> f_xs;             // the source pixel
 wire [3:0]  ppw_sh = 4'd4 - {2'd0, f_bsh};
 wire [7:0]  widx = sx[10:0] >> ppw_sh;   // the word (8 bits: at most 1024 pixels of 8 bpp = 512... masked below)
 wire [3:0]  boff = (sx[3:0] & ((4'd1 << ppw_sh) - 4'd1)) << f_bsh;
-wire [7:0]  ridx0 = (widx + use_hs[0]) & f_lmask;
-wire [7:0]  ridx1 = (widx + use_hs[1]) & f_lmask;
-wire [7:0]  ridx2 = (widx + use_hs[2]) & f_lmask;
+// karabas: the word index and the bit offset registered (stage 0b) before the scroll is added and
+// the line buffer read: the shifts, the add and the read in one clock missed 65 MHz on the Go by
+// 0.5 ns. The syncs and the enable go through one more register (PD).
+reg  [7:0]  widx_r = 8'd0;
+reg  [3:0]  boff_r = 4'd0;
+reg         vis0 = 1'b0;
+reg         rd_buf = 1'b0;   // the buffer to read, with the index: fetch_buf flips at the line start
+always @(posedge clk) begin
+    rd_buf <= fetch_buf;
+    widx_r <= widx;
+    boff_r <= boff;
+    vis0   <= px_vis;
+end
+wire [7:0]  ridx0 = (widx_r + use_hs[0]) & f_lmask;
+wire [7:0]  ridx1 = (widx_r + use_hs[1]) & f_lmask;
+wire [7:0]  ridx2 = (widx_r + use_hs[2]) & f_lmask;
 
 // stage 1: the buffer reads (the buffer not being filled)
 reg [31:0] w0 = 32'd0, w1 = 32'd0, w2 = 32'd0;
@@ -486,12 +499,12 @@ reg        h0 = 1'b0, h1 = 1'b0, h2 = 1'b0;
 reg [3:0]  boff1 = 4'd0;
 reg        vis1 = 1'b0;
 always @(posedge clk) begin
-    w0 <= fetch_buf ? lb0a[ridx0[7:1]] : lb0b[ridx0[7:1]];
-    w1 <= fetch_buf ? lb1a[ridx1[7:1]] : lb1b[ridx1[7:1]];
-    w2 <= fetch_buf ? lb2a[ridx2[7:1]] : lb2b[ridx2[7:1]];
+    w0 <= rd_buf ? lb0a[ridx0[7:1]] : lb0b[ridx0[7:1]];
+    w1 <= rd_buf ? lb1a[ridx1[7:1]] : lb1b[ridx1[7:1]];
+    w2 <= rd_buf ? lb2a[ridx2[7:1]] : lb2b[ridx2[7:1]];
     h0 <= ridx0[0]; h1 <= ridx1[0]; h2 <= ridx2[0];
-    boff1 <= boff;
-    vis1  <= px_vis;
+    boff1 <= boff_r;
+    vis1  <= vis0;
 end
 
 // stage 2: the bits
