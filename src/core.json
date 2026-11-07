@@ -1,7 +1,7 @@
 {
     "id": "bk",
     "name": "BK-0011M",
-    "build": "26110701",
+    "build": "26110702",
     "visible": true,
     "type": "osd",
     "order": 14,
@@ -205,9 +205,35 @@
             "hotkey": "Menu+V"
         },
         {
+            "type": "S",
+            "name": "Display",
+            "key": "display",
+            "index": 11,
+            "options": [
+                {
+                    "name": "Color",
+                    "key": "color",
+                    "value": 0
+                },
+                {
+                    "name": "Grayscale",
+                    "key": "grayscale",
+                    "value": 2
+                },
+                {
+                    "name": "Mono",
+                    "key": "mono",
+                    "value": 1
+                }
+            ],
+            "default": "color",
+            "hotkey": "Menu+M"
+        },
+        {
             "type": "T",
             "name": "Reset",
-            "hotkey": "Menu+F12"
+            "hotkey": "Menu+F12",
+            "index": 10
         }
     ]
 }

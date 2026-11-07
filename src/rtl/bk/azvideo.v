@@ -51,6 +51,8 @@ module azvideo (
     input      [15:0] mapper_ctrl,  // 177346: the timer bits
     input             cold,
     input      [1:0]  hotkey,       // keyboard.v, one clock: 1 АР2+ЛАТ, 2 АР2+РУС
+    input             mono,         // karabas: the BK's 4-colour screen shown as on a monochrome monitor
+    input             gray,         // karabas: the picture in shades of grey
 
     // the SDRAM's burst port
     output reg        v_req,
@@ -237,10 +239,15 @@ az_palette pal (
 //------------------------------------------------------------------------
 // The mode, decoded, and its frame copy
 //------------------------------------------------------------------------
-wire [2:0] m_mode  = scr_csr[2:0];
-wire [1:0] m_bsh   = scr_csr[1:0];          // bits per pixel: 1 << bsh
-wire [1:0] m_llen  = scr_csr[4:3];          // words a line: 32 << llen
-wire [1:0] m_xs    = scr_csr[7:6];          // pixel width: 1 << xs
+// karabas: with `mono` the legacy 4-colour mode (1: 2 bits a point, 256 wide) is drawn as the
+// monochrome one (0: 1 bit, 512 wide, half the pixel width), what a BK on a monochrome monitor shows,
+// as the АР2+ЛАТ hotkey does but whatever the software writes into 177230
+wire       mono_sub = mono && (scr_csr[2:0] == 3'd1) && (scr_csr[7:6] != 2'd0);
+wire [15:0] eff_csr = mono_sub ? {scr_csr[15:8], scr_csr[7:6] - 2'd1, scr_csr[5:1], 1'b0} : scr_csr;
+wire [2:0] m_mode  = eff_csr[2:0];
+wire [1:0] m_bsh   = eff_csr[1:0];          // bits per pixel: 1 << bsh
+wire [1:0] m_llen  = eff_csr[4:3];          // words a line: 32 << llen
+wire [1:0] m_xs    = eff_csr[7:6];          // pixel width: 1 << xs
 wire [1:0] m_ys    = scr_csr[10:9];         // line height: 1 + ys
 wire       m_sync  = scr_csr[11];
 wire [3:0] m_roll  = scr_csr[15:12];
@@ -545,11 +552,16 @@ end
 
 
 wire black = f_ext && (vline_d[PD-1] > 10'd192);
+// karabas: the luminance of a palette colour, 0.30 R + 0.59 G + 0.11 B (77, 151, 28 of 256) on 5 bits
+wire [12:0] gray_sum = pal_b_dout[14:10] * 8'd77 + pal_b_dout[9:5] * 8'd151 + pal_b_dout[4:0] * 8'd28;
+wire [7:0]  gray_y = {gray_sum[12:8], gray_sum[12:10]};
 always @(posedge clk) begin
     hs <= hs_d[PD-1];
     vs <= vs_d[PD-1];
     de <= de_d[PD-1];
-    if (de_d[PD-1] && !black) begin
+    if (de_d[PD-1] && !black && gray) begin
+        r <= gray_y; g <= gray_y; b <= gray_y;
+    end else if (de_d[PD-1] && !black) begin
         r <= {pal_b_dout[14:10], pal_b_dout[14:12]};
         g <= {pal_b_dout[9:5],   pal_b_dout[9:7]};
         b <= {pal_b_dout[4:0],   pal_b_dout[4:2]};

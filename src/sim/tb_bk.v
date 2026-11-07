@@ -33,6 +33,9 @@ module tb_bk (
     output     [31:0] sdr_writes
 );
 
+reg mono_pa = 1'b0, gray_pa = 1'b0;
+initial begin mono_pa = $test$plusargs("mono"); gray_pa = $test$plusargs("gray"); end
+
 wire [12:0] SDR_A;
 wire [1:0]  SDR_BA, SDR_DQM;
 wire [15:0] SDR_DQ;
@@ -41,7 +44,7 @@ wire [7:0]  rtc_a;
 reg  [7:0]  rtc_do = 8'd0;
 
 bk_system sys (
-    .clk(clk), .lock(1'b1), .reset(reset), .turbo(turbo), .joy_on(1'b0), .covox_714(1'b0), .volume(2'b11),
+    .clk(clk), .lock(1'b1), .reset(reset), .turbo(turbo), .joy_on(1'b0), .covox_714(1'b0), .volume(2'b11), .mono(mono_pa), .gray(gray_pa),
     .rom_wr(rom_wr), .rom_addr(rom_addr), .rom_data(rom_data),
     .scancode(scancode), .scancode_upd(scancode_upd), .joy(13'd0),
     .img_mounted(img_mounted), .img_size(img_size), .img_wp(8'd0),

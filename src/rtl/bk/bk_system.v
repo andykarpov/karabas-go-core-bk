@@ -25,6 +25,8 @@ module bk_system (
     input             joy_on,
     input             covox_714,    // the legacy Covox on 177714
     input      [1:0]  volume,
+    input             mono,         // the 4-colour screen as on a monochrome monitor
+    input             gray,         // shades of grey
 
     // the ROM set
     input             rom_wr,
@@ -242,7 +244,7 @@ azvideo vid (
     .clk(clk),
     .sync(b_sync), .adr(b_adr), .stb(b_stb), .we(b_we), .wtbt(b_wtbt), .din(b_dout),
     .dout(d_vid), .ack(a_vid), .wr_stb(b_wr_stb),
-    .mapper_ctrl(mapper_ctrl), .cold(cold), .hotkey(hotkey),
+    .mapper_ctrl(mapper_ctrl), .cold(cold), .hotkey(hotkey), .mono(mono), .gray(gray),
     .v_req(v_req), .v_adr(v_adr), .v_take(v_take), .v_dv(v_dv), .v_rdata(v_rdata),
     .hs(hs), .vs(vs), .de(de), .r(r), .g(g), .b(b),
     .frame_end(frame_end), .irq2(irq2), .reg664_out(), .scr_csr_out()

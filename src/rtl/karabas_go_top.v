@@ -326,6 +326,7 @@ wire sw_joy = sw[SW_JOY*8];
 wire sw_covox = sw[SW_COVOX*8];
 wire [1:0] sw_volume = sw[SW_VOLUME*8 +: 2];
 wire sw_reset = sw[SW_RESET*8];
+wire [1:0] sw_monitor = sw[SW_MONITOR*8 +: 2];
 
 // ------------------------------------------------------------------ the machine
 
@@ -342,6 +343,8 @@ bk_system bk (
 	.joy_on(sw_joy),
 	.covox_714(sw_covox),
 	.volume(sw_volume),
+	.mono(sw_monitor == 2'd1),
+	.gray(sw_monitor == 2'd2),
 	.rom_wr(rom_wr),
 	.rom_addr(rom_addr[24:0]),
 	.rom_data(rom_data),
