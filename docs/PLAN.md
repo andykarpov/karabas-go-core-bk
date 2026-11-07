@@ -59,7 +59,8 @@
   (`src/sim/run_bk.sh`: BIOS AZBK за 4 с машинного времени), XST машины отдельно: 58 % LUT, 14 BRAM.
 - **Ф1. Mini G**: топ, ucf, сборка, timing (сделано, 26110701: 69 % LUT, 85 % slices; Go и Mini тоже
   собраны, timing выполнен). На плате 2026-11-07: BIOS AZBK проходит, ANDOS 3.30 грузится с AZ0.
-  Осталось проверить: OSD, клавиатура, звук (SNDTEST.IMG), Dangerous Dave (образ пользователя).
+  26110702: клавиатура, РУС/ЛАТ, OSD, Display (Color / Grayscale / Mono), звук (все тесты SNDTEST), MEMTEST
+  на плате в порядке. Dangerous Dave не проверен (образа нет).
 - **Ф2. Go и Mini**: сборка, timing; проверка на платах по возможности.
 - **Ф3. Доводка**: запись блоков и EEPROM на плате, джойстик, турбо, ошибки из проверки; README, релиз
   (строка в `cores.json` karabas-go).
