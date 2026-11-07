@@ -38,7 +38,7 @@ Go (Xilinx Spartan-6 XC6SLX25). В работе: см. [docs/PLAN.md](docs/PLAN.
 `eeprom.dat` (настройки AZBK, 510 байт, из `soft/azbk/` retro-tang-bk) в `/bk` служит EEPROM.
 
 Клавиши: Esc КТ, F1 ПОВТ, F2 ВС, F3 ГРАФ, F5 -!->, F6 ИНД СУ, F7 БЛОК РЕД, F8 ШАГ, F9 СБР, F10 СТОП,
-F11 сброс, Alt АР2, правый Ctrl СУ, левый Ctrl РУС, Win ЛАТ, Caps Lock СТР; Alt+Win / Alt+левый Ctrl:
+F11 сброс, Alt АР2, правый Ctrl СУ, левый Ctrl РУС / ЛАТ по очереди, Caps Lock СТР; Alt+F4 (512 / 256) и Alt+левый Ctrl (палитра):
 горячие клавиши AZ.
 
 ## Сборка

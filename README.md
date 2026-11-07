@@ -38,7 +38,7 @@ Copy `bk.kg` to the SD card (SD1), the disk images to `/bk`. The units AZ0..AZ3 
 `eeprom.dat` (the AZBK settings, 510 bytes, from retro-tang-bk `soft/azbk/`) in `/bk` is the EEPROM.
 
 Keys: Esc KT, F1 POVT, F2 VS, F3 GRAF, F5 -!->, F6 INDSU, F7 BLOK RED, F8 SHAG, F9 SBR, F10 STOP, F11 reset,
-Alt AR2, right Ctrl SU, left Ctrl RUS, Win LAT, Caps Lock STR; Alt+Win / Alt+left Ctrl: the AZ hotkeys.
+Alt AR2, right Ctrl SU, left Ctrl RUS / LAT in turn, Caps Lock STR; Alt+F4 (512 / 256) and Alt+left Ctrl (palette): the AZ hotkeys.
 
 ## Build
 

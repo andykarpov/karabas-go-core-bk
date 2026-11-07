@@ -7,9 +7,13 @@
 //   Esc КТ  F1 ПОВТ  F2 ВС  F3 ГРАФ  F5 -!->  F6 ИНДСУ  F7 БЛОК РЕД
 //   F8 ШАГ  F9 СБР  F10 СТОП  F11 the reset key
 //   Ins |-->  Del |<--  Home/PgUp/End/PgDn the diagonal arrows
-//   Shift+Enter УСТ ТАБ  Shift+Tab СБР ТАБ  Left Ctrl РУС  Win ЛАТ
-//   Right Ctrl СУ  Alt АР2  Caps Lock СТР
+//   Shift+Enter УСТ ТАБ  Shift+Tab СБР ТАБ  Right Ctrl СУ  Alt АР2  Caps Lock СТР
+//   Left Ctrl РУС / ЛАТ, in turn (karabas: upstream has ЛАТ on Win, which is the board's hotkey
+//   key here); the AZ hotkeys Alt+Left Ctrl (palette) and Alt+F4 (512 / 256)
 //
+// A key held down is sent once: the typematic repeats of the host are dropped (the BK repeats a
+// held key itself through 177716 bit 6), and a release goes only for a key that was sent as down,
+// so keyboard.v's count of the keys held stays right.
 // An event for keyboard.v is key_code with key_flags, one clock of key_stb:
 // flags 0 release, 1 АР2, 2 СТОП, 3 the reset key, 4 a controller hotkey
 // (АР2+ЛАТ code 1, АР2+РУС code 2).
@@ -27,6 +31,10 @@ localparam [7:0] A_STOP = 8'hF0, A_RESET = 8'hF1, A_CAPS = 8'hF2;
 localparam [7:0] F_REL = 8'h01, F_AR2 = 8'h02, F_STOP = 8'h04, F_RESET = 8'h08, F_HOT = 8'h10;
 
 reg upd_d = 1'b0;
+reg held_map [0:511];            // {ext, code}: down
+integer hi;
+initial for (hi = 0; hi < 512; hi = hi + 1) held_map[hi] = 1'b0;
+wire was_down = held_map[{ext, scancode}];
 reg ext = 1'b0, rel = 1'b0;
 reg lsh = 1'b0, rsh = 1'b0, ctl = 1'b0, lalt = 1'b0, ralt = 1'b0;
 reg rus = 1'b0;                  // РУС, else ЛАТ (as bk.c, ЛАТ at the start)
@@ -88,22 +96,24 @@ always @(posedge clk) begin
             9'h114: ctl <= !rel;          // right control: СУ
             9'h011: lalt <= !rel;         // Alt: АР2
             9'h111: ralt <= !rel;
-            9'h014: begin                 // left control: РУС, with АР2 the palette hotkey
-                if (!rel) begin
+            9'h014: begin                 // left control: РУС / ЛАТ in turn, with АР2 the palette hotkey
+                held_map[{ext, scancode}] <= !rel;
+                if (!rel && !was_down) begin
                     if (ar2) send(8'd2, F_HOT);
-                    else begin rus <= 1'b1; send(8'o16, 8'd0); end
-                end else if (!ar2) send(8'o16, F_REL);
+                    else begin rus <= !rus; send(rus ? 8'o17 : 8'o16, 8'd0); end
+                end else if (rel && was_down && !ar2) send(rus ? 8'o16 : 8'o17, F_REL);
             end
-            9'h11F, 9'h127: begin         // a Win key: ЛАТ, with АР2 the 512/256 hotkey
-                if (!rel) begin
-                    if (ar2) send(8'd1, F_HOT);
-                    else begin rus <= 1'b0; send(8'o17, 8'd0); end
-                end else if (!ar2) send(8'o17, F_REL);
+            9'h00C: begin                 // F4: with АР2 the 512/256 hotkey
+                held_map[{ext, scancode}] <= !rel;
+                if (!rel && !was_down && ar2) send(8'd1, F_HOT);
             end
             default: begin
-                rom_a <= {lsh | rsh, ext, scancode};
-                pressed <= !rel;
-                st <= 2'd1;
+                held_map[{ext, scancode}] <= !rel;
+                if (rel ? was_down : !was_down) begin   // not a repeat, not a release of a key never sent
+                    rom_a <= {lsh | rsh, ext, scancode};
+                    pressed <= !rel;
+                    st <= 2'd1;
+                end
             end
             endcase
         end
