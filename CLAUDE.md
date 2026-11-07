@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 БК-0011М with MAXIOL's AZBK controller (32 MB mapper, 256-colour 1024 x 768 display with three layers, blitter, two AYs, Covox, sound DMA, disk controller, EEPROM, clock; no network) on the Karabas Go, Mini and Mini G boards: Xilinx Spartan-6 XC6SLX25-2, ISE 14.7 (XST). The machine is [retro-tang-bk](https://github.com/lordamot/retro-tang-bk) `b4b5850` (Sergei Lemeshev and contributors, MIT; the VM1 is Vslav's model in Sorgelig's wrapper, GPL v2). The port is ours: `src/` holds the sources, edited directly; `docs/sources.md` lists the origin of every file and the changes to the taken ones. Plan and decisions, in Russian: `docs/PLAN.md` (phases; record a changed decision there).
 
-Status: phase 0 done (the machine boots the AZBK BIOS in simulation). Mini G first, then Go and Mini.
+Status: released 26110703 (all boards; Mini G checked on hardware, Go and Mini not). What is next: `docs/BACKLOG.md`.
 
 ## Layout
 
