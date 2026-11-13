@@ -97,7 +97,10 @@
             "bitstream": "karabas_mini.bin"
         },
         "minig": {
-            "bitstream": "karabas_minig.bin"
+            "link": 2,
+            "build": "26111309",
+            "bitstream": "karabas_minig.bin",
+            "spi_freq": 32
         }
     },
     "osd": [
