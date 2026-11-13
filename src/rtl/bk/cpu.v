@@ -208,10 +208,16 @@ vic_wb #(3) vic (
 //------------------------------------------------------------------------
 // Data in and the acknowledge
 //------------------------------------------------------------------------
+// 177702: the VM1 answers it itself, but drops that reply half a clock after its first sample
+// (rply_s2 <= start_irq): oe_clr_fc then never sees rply_ack[1] with the reply gone, qbus_win and
+// SYNC stay up and the microcode stops (CMOS Setup of AZBK: MOV #33,@#177702 hung the machine). An
+// outside reply held with the strobe ends the cycle as for any register; reads of it too (with
+// start_irq set the VM1 gives no reply to them at all).
+wire ack_702 = bus_stb && bus_sync && bus_addr == 16'o177702;
 always @(posedge clk) begin
     if (ce_bus_2) begin
         dout_delay <= {dout_delay[1:0], cpu_dout_out};
-        cpu_ack    <= ack | ivec_ack;
+        cpu_ack    <= ack | ivec_ack | ack_702;
     end
     cpu_din <= cpureg_data | sysreg_data | port_data | ivec_data | din;
 end

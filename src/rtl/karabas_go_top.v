@@ -4,7 +4,7 @@
 /*
  BK-0011M + AZBK core for Karabas Go (VGA through the video DAC, PCM5102).
  The same as karabas_minig_top.v except the board (as core-orion128): VGA 8:8:8 + V_CLK (65 MHz) instead
- of HDMI, no FT_CLK_OUT, MCU_SCK not on a clock pin (bursts at the link clock), the chip selects of the
+ of HDMI, no FT_CLK_OUT, MCU_SCK not on a clock pin (INT of link v2 on MCU_SPI_IO[0]), the chip selects of the
  FT812 / SD2 on their own pins; the floppy connector unused (its outputs 0: high = active on the Go).
 
  Clocks: one PLL, VCO 650 MHz (50 * 13): clk_sys 65.0 MHz (/10: the machine, the SDRAM (its clock an
@@ -89,7 +89,7 @@ module karabas_go_top (
 	output wire MCU_MISO,
 	input wire MCU_SPI_FT_CS_N,
 	input wire MCU_SPI_SD2_CS_N,
-	inout wire [1:0] MCU_SPI_IO, // [0] burst ready (firmware IO1, GPIO2), [1] burst cs_n (IO0, GPIO14)
+	inout wire [1:0] MCU_SPI_IO, // [0] INT of link v2 (firmware IO1, GPIO2), [1] unused (IO0, GPIO14)
 
 	output wire MIDI_TX,
 	output wire MIDI_CLK,
@@ -183,125 +183,115 @@ ODDR2 oddr_v_clk (.Q(V_CLK), .C0(clk_sys), .C1(~clk_sys), .CE(1'b1), .D0(1'b1), 
 // ------------------------------------------------------------------ MCU
 
 wire mcu_sck = MCU_SCK;
-wire mcu_burst_ready;
-assign MCU_SPI_IO[0] = mcu_burst_ready;
+
+// karabas: MCU link v2 (karabas-go-firmware docs/link_v2.md, kg_mcu2); INT on MCU_SPI_IO[0] (N9, IO1 of the firmware)
+wire mcu_int;
+assign MCU_SPI_IO[0] = mcu_int;
 assign MCU_SPI_IO[1] = 1'bz;
 
+`include "bk_switches.vh"
 wire [7:0] kb_scancode;
-wire kb_scancode_upd;
-wire [12:0] joy_l, joy_r;
-wire rom_active, rom_wr;
-wire [31:0] rom_addr;
-wire [7:0] rom_data;
-wire [15:0] softsw_command, osd_command;
+wire [15:0] joy_l16, joy_r16;
+wire [12:0] joy_l = joy_l16[12:0], joy_r = joy_r16[12:0];
+wire [1:0] ld_kind;
+wire [7:0] ld_data;
+wire [31:0] ld_addr;
+wire ld_active, ld_wr;
+wire [SW_N*8-1:0] sw;
 wire mcu_busy;
 wire dvi_only;
 wire ft_cs_n, ft_mosi, ft_spi_on, sd2_cs_n, sd2_mosi;
-wire [7:0] img_mounted, img_data, img_result, img_wp;
-wire [63:0] img_size;
-wire img_data_wr, img_result_wr, img_q_wr, img_q_ack;
-wire [8:0] img_data_addr;
-wire [15:0] img_sum;
-wire [23:0] img_q_di;
+wire [7:0] img_wp;
 wire [7:0] rtc_a, rtc_do;
+wire [7:0] ps2_code;
+wire ps2_kind, ps2_wr;
+wire osd_wr, osd_en, osd_zoom;
+wire [11:0] osd_waddr;
+wire [7:0] osd_wdata;
+wire [23:0] osd_fg, osd_bg;
+wire [1:0] osd_alpha, osd_place;
+wire [4:0] osd_px, osd_ph;
+wire [3:0] osd_py;
+wire [5:0] osd_pw;
+// the AZ units and the EEPROM: the mounter of kg_mcu2 (the sector interface of img_sdc) to bk_system
+wire [7:0] sdc_img_mounted, sdc_rd, sdc_wr, sdc_byte_in_data, sdc_byte_out_data;
+wire [63:0] sdc_img_size;
+wire [31:0] sdc_sector;
+wire sdc_busy, sdc_done, sdc_error, sdc_byte_in_strobe;
+wire [8:0] sdc_byte_addr;
 
-kg_mcu #(
-	.BURST_MAX_MHZ(0),  // MCU_SCK is not on a clock pin: bursts at the link clock
+kg_mcu2 #(
+	.CAPS(16'h0004),     // write protected images
+	.SW_N(SW_N),
 	.CS_FILTER(3),
+	.ENABLE_OSD(1),
+	.ENABLE_IMG(1),      // the AZ units and the EEPROM: the images of the F items
+	.IMG_OUT_LATENCY(4),
 	.ENABLE_RTC(1),      // the clock of the AZ controller (rtc_mode 1: DS1307 registers)
 	.RTC_SKIP_0D(0),
-	.ENABLE_UART(0),
-	.ENABLE_MATRIX(0),
-	.ENABLE_DEBUG(0),
-	.ENABLE_IMG(1),      // the AZ units and the EEPROM: the images of the F items
-	.ENABLE_IMG_WP(1),
-	.ENABLE_FILE(0),
 	.ENABLE_FT(1),
 	.ENABLE_SD2(1)
 ) mcu (
 	.CLK(clk_sys),
 	.N_RESET(~areset),
 
+	.MCU_SCK(mcu_sck),
 	.MCU_MOSI(MCU_MOSI),
 	.MCU_MISO(MCU_MISO),
-	.MCU_SCK(mcu_sck),
 	.MCU_SS(MCU_CS_N),
+	.MCU_INT(mcu_int),
 	.MCU_SPI_FT_SS(MCU_SPI_FT_CS_N),
 	.MCU_SPI_SD2_SS(MCU_SPI_SD2_CS_N),
-	.MCU_BURST_CS_N(MCU_SPI_IO[1]),
-	.MCU_BURST_READY(mcu_burst_ready),
 
-	.KB_SCANCODE(kb_scancode),
-	.KB_SCANCODE_UPD(kb_scancode_upd),
-	.JOY_L(joy_l),
-	.JOY_R(joy_r),
+	.SW(sw), .SW_WR(), .SW_INDEX(), .SW_VALUE(), .HW_ID(), .DVI_ONLY(dvi_only), .CORE_BUILD(), .FW_BUILD(),
+	.BUSY(mcu_busy), .BTNS(), .RELOAD_REQ(1'b0), .RELOAD_CORE(8'd0),
 
-	.ROMLOADER_ACTIVE(rom_active),
-	.ROMLOAD_ADDR(rom_addr),
-	.ROMLOAD_DATA(rom_data),
-	.ROMLOAD_WR(rom_wr),
+	.KBD(), .KBD_WR(), .PS2_CODE(ps2_code), .PS2_KIND(ps2_kind), .PS2_WR(ps2_wr),
+	.MS_X(), .MS_Y(), .MS_Z(), .MS_B(), .MS_WR(),
+	.JOY_L(joy_l16), .JOY_R(joy_r16), .JOY_WR(),
+	.PS2_CMD(16'h0000), .PS2_CMD_WR(1'b0),
 
-	.FILELOAD_ACTIVE(),
-	.FILELOAD_ADDR(),
-	.FILELOAD_DATA(),
-	.FILELOAD_WR(),
-	.FILELOAD_SLOT(),
+	.LD_KIND(ld_kind), .LD_SLOT(), .LD_SIZE(), .LD_START(), .LD_ACTIVE(ld_active), .LD_END(),
+	.LD_ADDR(ld_addr), .LD_DATA(ld_data), .LD_WR(ld_wr), .LD_READY(1'b1),
 
-	.SOFTSW_COMMAND(softsw_command),
-	.OSD_COMMAND(osd_command),
-	.BUSY(mcu_busy),
+	.OSD_WR(osd_wr), .OSD_WADDR(osd_waddr), .OSD_WDATA(osd_wdata), .OSD_EN(osd_en),
+	.OSD_FG(osd_fg), .OSD_BG(osd_bg), .OSD_ALPHA(osd_alpha), .OSD_PX(osd_px), .OSD_PY(osd_py),
+	.OSD_PW(osd_pw), .OSD_PH(osd_ph), .OSD_PLACE(osd_place), .OSD_ZOOM(osd_zoom),
 
-	.FT_SPI_ON(ft_spi_on),
+	.SDC_IMG_MOUNTED(sdc_img_mounted), .SDC_IMG_SIZE(sdc_img_size),
+	.SDC_RD(sdc_rd), .SDC_WR(sdc_wr), .SDC_SECTOR(sdc_sector),
+	.SDC_BUSY(sdc_busy), .SDC_DONE(sdc_done), .SDC_ERROR(sdc_error), .SDC_SLOT(),
+	.SDC_BYTE_IN_STROBE(sdc_byte_in_strobe), .SDC_BYTE_ADDR(sdc_byte_addr),
+	.SDC_BYTE_IN_DATA(sdc_byte_in_data), .SDC_BYTE_OUT_DATA(sdc_byte_out_data),
+	.IMG_WP(img_wp), .IMG_PHYS_WR(), .IMG_PHYS(), .IMG_FLUSH(), .FDD_CHNG_WR(), .FDD_CHNG(),
+	.FDD_CHNG_REQ(1'b0), .FDD_CHNG_DS(2'd0), .IMG_ACTIVE(),
+
+	.PORT_OUT_DATA(), .PORT_OUT_WR(), .PORT_OUT_READY(4'b1111), .PORT_IN_DATA(32'd0), .PORT_IN_WR(4'd0),
+	.PORT_CFG(128'd0), .PORT_IN_FULL(), .PORT_STAT(), .PORT_STAT_WR(),
+	.RTC_A(rtc_a), .RTC_DI(8'd0), .RTC_CS(1'b0), .RTC_WR_N(1'b1), .RTC_DO(rtc_do),
+	.MATRIX_CMD(24'd0), .MATRIX_CMD_WR(1'b0), .DEBUG_ADDR(16'd0), .DEBUG_DATA(16'd0),
+
+	.FT_SPI_ON(ft_spi_on), .FT_VGA_ON(), .FT_RESET(), .FT_SCK(), .FT_MOSI(ft_mosi), .FT_MISO(FT_SPI_MISO),
 	.FT_CS_N(ft_cs_n),
-	.FT_MOSI(ft_mosi),
-	.FT_MISO(FT_SPI_MISO),
-	.FT_SCK(),
-	.SD2_CS_N(sd2_cs_n),
-	.SD2_MOSI(sd2_mosi),
-	.SD2_MISO(SD_DO),
-	.SD2_SCK(),
-
-	.DVI_ONLY(dvi_only),
-
-	.RTC_A(rtc_a),
-	.RTC_DI(8'h00),
-	.RTC_DO(rtc_do),
-	.RTC_CS(1'b0),
-	.RTC_WR_N(1'b1),
-	.IMG_MOUNTED(img_mounted),
-	.IMG_SIZE(img_size),
-	.IMG_WP(img_wp),
-	.IMG_DATA_WR(img_data_wr),
-	.IMG_DATA_ADDR(img_data_addr),
-	.IMG_DATA(img_data),
-	.IMG_RESULT_WR(img_result_wr),
-	.IMG_RESULT(img_result),
-	.IMG_SUM(img_sum),
-	.IMG_Q_WR(img_q_wr),
-	.IMG_Q_DI(img_q_di),
-	.IMG_Q_ACK(img_q_ack),
-
-	// not used by this core
-	.PS2_COMMAND(16'h0000),
-	.PS2_COMMAND_WR(1'b0),
-	.UART_RX_DATA(),
-	.UART_RX_IDX(),
-	.UART_TX_DATA(8'h00),
-	.UART_TX_WR(1'b0),
-	.UART_TX_MODE(1'b0),
-	.UART_DLM(8'h00),
-	.UART_DLL(8'h00),
-	.UART_DLM_WR(1'b0),
-	.UART_DLL_WR(1'b0),
-	.MATRIX_CMD(24'h000000),
-	.MATRIX_CMD_WR(1'b0),
-	.DEBUG_ADDR(16'h0000),
-	.DEBUG_DATA(16'h0000),
-	.ESP_UART_RX_DATA(8'h00),
-	.ESP_UART_RX_WR(1'b0),
-	.FLASHBOOT_START(1'b0),
-	.FLASHBOOT_COREID(5'd0)
+	.SD2_SCK(), .SD2_MOSI(sd2_mosi), .SD2_MISO(SD_DO), .SD2_CS_N(sd2_cs_n)
 );
+
+// the roms of the core file (LD kind 0) on the rom loader signals of bk_system
+wire rom_active = ld_active && ld_kind == 2'd0;
+wire rom_wr = ld_wr && ld_kind == 2'd0;
+wire [31:0] rom_addr = ld_addr;
+wire [7:0] rom_data = ld_data;
+
+// the PS/2 scancode (set 2) as the toggle of v1 (bk_system takes a change of it)
+reg kb_upd_t = 1'b0;
+reg [7:0] kb_code_r = 8'd0;
+always @(posedge clk_sys)
+	if (ps2_wr && !ps2_kind) begin
+		kb_code_r <= ps2_code;
+		kb_upd_t <= ~kb_upd_t;
+	end
+assign kb_scancode = kb_code_r;
+wire kb_scancode_upd = kb_upd_t;
 
 assign FT_SPI_CS_N = ft_spi_on ? ft_cs_n : 1'b1;
 assign FT_SPI_SCK = ft_spi_on ? MCU_SCK : 1'b1;
@@ -313,14 +303,7 @@ assign SD_CLK = MCU_SCK;
 // ------------------------------------------------------------------ soft switches
 
 // the index of an item = its position in "osd" of core.json, the F items and the separator included
-`include "bk_switches.vh"
-wire [SW_N*8-1:0] sw;
-kg_soft_switches #(.N(SW_N)) soft_switches (
-	.clk(clk_sys),
-	.command(softsw_command),
-	.regs(sw),
-	.upd()
-);
+// the switches: the SW registers of kg_mcu2 (bk_switches.vh above)
 wire sw_turbo = sw[SW_CPU*8];
 wire sw_joy = sw[SW_JOY*8];
 wire sw_covox = sw[SW_COVOX*8];
@@ -335,7 +318,7 @@ wire vid_hs, vid_vs, vid_de;
 wire signed [15:0] audio_l, audio_r;
 wire disk_busy;
 
-bk_system bk (
+bk_system #(.LINK(2)) bk (
 	.clk(clk_sys),
 	.lock(locked),
 	.reset(sw_reset || mcu_busy || rom_active),
@@ -351,18 +334,22 @@ bk_system bk (
 	.scancode(kb_scancode),
 	.scancode_upd(kb_scancode_upd),
 	.joy(joy_l | joy_r),
-	.img_mounted(img_mounted),
-	.img_size(img_size),
+	.img_mounted(8'd0),
+	.img_size(64'd0),
 	.img_wp(img_wp),
-	.img_data_wr(img_data_wr),
-	.img_data_addr(img_data_addr),
-	.img_data(img_data),
-	.img_result_wr(img_result_wr),
-	.img_result(img_result),
-	.img_sum(img_sum),
-	.img_q_wr(img_q_wr),
-	.img_q_di(img_q_di),
-	.img_q_ack(img_q_ack),
+	.img_data_wr(1'b0),
+	.img_data_addr(9'd0),
+	.img_data(8'd0),
+	.img_result_wr(1'b0),
+	.img_result(8'd0),
+	.img_sum(16'd0),
+	.img_q_wr(),
+	.img_q_di(),
+	.img_q_ack(1'b0),
+	.sdc_img_mounted_i(sdc_img_mounted), .sdc_img_size_i(sdc_img_size), .sdc_rd_o(sdc_rd), .sdc_wr_o(sdc_wr),
+	.sdc_sector_o(sdc_sector), .sdc_busy_i(sdc_busy), .sdc_done_i(sdc_done), .sdc_error_i(sdc_error),
+	.sdc_byte_in_strobe_i(sdc_byte_in_strobe), .sdc_byte_addr_i(sdc_byte_addr),
+	.sdc_byte_in_data_i(sdc_byte_in_data), .sdc_byte_out_data_o(sdc_byte_out_data),
 	.rtc_a(rtc_a),
 	.rtc_do(rtc_do),
 	.hs(vid_hs),
@@ -385,19 +372,19 @@ bk_system bk (
 
 // ------------------------------------------------------------------ OSD
 
-// 1024 x 768: the counters start at the leading edge of the syncs (1048 pixels / 771 lines into the
-// frame), a step is two pixels / lines (V_DIV4_HEIGHT above the 806 lines of the frame): the OSD
-// (512 x 416) in the middle starts 296 + 256 pixels and 35 + 176 lines after them
+// the bitmap OSD of link v2 (kg_l2_osd_overlay): centred in de, the scale from its size,
+// 2 clocks of latency with its syncs and de
 wire [23:0] osd_rgb;
-kg_osd_overlay #(.H_OFFSET(276), .V_OFFSET(105), .H_DIV4_WIDTH(1400), .V_DIV4_HEIGHT(900)) osd (
+wire osd_hs, osd_vs, osd_de;
+kg_l2_osd_overlay osd (
+	.wclk(clk_sys),
+	.osd_wr(osd_wr), .osd_waddr(osd_waddr), .osd_wdata(osd_wdata), .osd_en(osd_en),
+	.osd_fg(osd_fg), .osd_bg(osd_bg), .osd_alpha(osd_alpha), .osd_px(osd_px), .osd_py(osd_py),
+	.osd_pw(osd_pw), .osd_ph(osd_ph), .osd_place(osd_place), .osd_zoom(osd_zoom),
+	.icon_on(8'd0), .icon_act(8'd0),
 	.clk(clk_sys),
-	.rgb_i({vid_r, vid_g, vid_b}),
-	.rgb_o(osd_rgb),
-	.hsync_i(vid_hs),
-	.vsync_i(vid_vs),
-	.v_offset(11'd0),
-	.h_offset(11'd0),
-	.osd_command(osd_command)
+	.rgb_i({vid_r, vid_g, vid_b}), .hs_i(vid_hs), .vs_i(vid_vs), .de_i(vid_de),
+	.rgb_o(osd_rgb), .hs_o(osd_hs), .vs_o(osd_vs), .de_o(osd_de)
 );
 
 // ------------------------------------------------------------------ audio
@@ -421,8 +408,8 @@ always @(posedge clk_sys) begin
 	vga_r <= osd_rgb[23:16];
 	vga_g <= osd_rgb[15:8];
 	vga_b <= osd_rgb[7:0];
-	vga_hs <= ~vid_hs;
-	vga_vs <= ~vid_vs;
+	vga_hs <= ~osd_hs;   // the syncs of the overlay: in step with osd_rgb
+	vga_vs <= ~osd_vs;
 end
 assign VGA_R = vga_r;
 assign VGA_G = vga_g;
