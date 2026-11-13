@@ -107,4 +107,45 @@ always @(posedge clk) begin
     end
 end
 
+// +bus also logs every SYNC (internal 1777xx cycles too) and a cycle that hangs over 20000 clocks,
+// with the VM1's start_irq state
+reg sync_d2 = 1'b0;
+integer hang = 0;
+always @(posedge clk) begin
+    sync_d2 <= sys.cpu1.bus_sync;
+    if (bus_log && bus_n < bus_max && cyc >= bus_at * 48'd65000) begin
+        if (sys.cpu1.bus_sync && !sync_d2)
+            $display("   sync %06o we %b psel %b sirq %b s2 %b", sys.cpu1.bus_addr, sys.cpu1.bus_we, sys.cpu1.cpu_psel,
+                sys.cpu1.core.core.start_irq, sys.cpu1.core.core.rply_s2);
+        if (sys.cpu1.bus_sync && (sys.cpu1.cpu_din_out || sys.cpu1.cpu_dout_out)) hang = hang + 1; else hang = 0;
+        if (hang == 20000) begin
+            bus_n = bus_n + 1;
+            $display("HANG at %06o we %b din %b dout %b dout_in %b rply %b sirq %b s2 %b sel02 %b", sys.cpu1.bus_addr, sys.cpu1.bus_we,
+                sys.cpu1.cpu_din_out, sys.cpu1.cpu_dout_out, sys.cpu1.cpu_dout_in, sys.cpu1.core.core.pin_rply_in,
+                sys.cpu1.core.core.start_irq, sys.cpu1.core.core.rply_s2, sys.cpu1.core.core.sel_02);
+        end
+    end
+end
+
+// +busat also starts a trace of the VM1 after a write to 177702 (the CMOS Setup hang): 4000 clocks,
+// a line per change of the bus handshake / the start request
+reg tr_on = 1'b0;
+integer tr_n = 0;
+reg [15:0] tr_last = 16'd0;
+wire [15:0] tr_now = { sys.cpu1.core.core.sync_out, sys.cpu1.core.core.din_out, sys.cpu1.core.core.dout_out,
+	sys.cpu1.core.core.pin_rply_in, sys.cpu1.core.core.sel_02, sys.cpu1.core.core.start_irq,
+	sys.cpu1.core.core.rply_s2, sys.cpu1.core.core.rply_ack, sys.cpu1.core.core.qbus_flag,
+	sys.cpu1.core.core.mjres, sys.cpu1.core.core.plm1x_hl, sys.cpu1.core.core.reg_csr };
+always @(posedge clk) begin
+	if (bus_log && sys.b_stb_d && !sys.b_stb && sys.b_we && sys.b_adr == 16'o177702) tr_on <= 1'b1;
+	if (tr_on && tr_n < 4000) begin
+		tr_n = tr_n + 1;
+		if (tr_now != tr_last || tr_n == 1)
+			$display("  tr %0d sync %b din %b dout %b rply %b sel02 %b sirq %b s2 %b ack %b qf %b mjres %b hl %b csr %b plr %h",
+				tr_n, tr_now[15], tr_now[14], tr_now[13], tr_now[12], tr_now[11], tr_now[10], tr_now[9],
+				tr_now[8:6], tr_now[5], tr_now[4], tr_now[3], tr_now[2:0], sys.cpu1.core.core.plr);
+		tr_last <= tr_now;
+	end
+end
+
 endmodule
