@@ -88,14 +88,20 @@ always @(posedge clk) begin
         $display("az %04o unit %0d blk %0d %s", sys.ctl.cmd, sys.ctl.unit, sys.ctl.blkn, sys.ctl.csr[15] ? "ERR" : "ok");
 end
 
-// +bus: the first bus cycles of the processor, N = +busn=N
+// +bus: the first bus cycles of the processor, N = +busn=N; +busat=MS: from that time of the machine on
 reg bus_log = 1'b0;
-integer bus_n = 0, bus_max = 400;
-initial begin bus_log = $test$plusargs("bus"); if (!$value$plusargs("busn=%d", bus_max)) bus_max = 400; end
+integer bus_n = 0, bus_max = 400, bus_at = 0;
+reg [47:0] cyc = 48'd0;
+initial begin
+    bus_log = $test$plusargs("bus");
+    if (!$value$plusargs("busn=%d", bus_max)) bus_max = 400;
+    if (!$value$plusargs("busat=%d", bus_at)) bus_at = 0;
+end
 reg stb_d = 1'b0;
 always @(posedge clk) begin
     stb_d <= sys.b_stb;
-    if (bus_log && bus_n < bus_max && sys.b_stb_d && !sys.b_stb) begin
+    cyc <= cyc + 48'd1;
+    if (bus_log && bus_n < bus_max && cyc >= bus_at * 48'd65000 && sys.b_stb_d && !sys.b_stb) begin
         bus_n = bus_n + 1;
         $display("%0d %s %06o = %06o", bus_n, sys.b_we ? "wr" : "rd", sys.b_adr, sys.b_we ? sys.b_dout : sys.cpu1.cpu_din);
     end
