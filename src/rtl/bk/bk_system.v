@@ -17,7 +17,11 @@
 //     images of the F items (img_sdc.v) and the clock of kg_mcu;
 //   - the keyboard is bk_kbd.v, upstream's mnano/bk.c in RTL.
 //========================================================================
-module bk_system (
+module bk_system #(
+    // the MCU link: 1 = v1 (kg_mcu: the img_* stream, img_sdc in here), 2 = v2 (kg_mcu2: its mounter has
+    // the sector interface of img_sdc, the sdc_* ports below; img_* unused)
+    parameter LINK = 1
+) (
     input             clk,
     input             lock,         // the PLL
     input             reset,        // a level: the machine held
@@ -50,6 +54,19 @@ module bk_system (
     output            img_q_wr,
     output     [23:0] img_q_di,
     input             img_q_ack,
+    // LINK 2: the sector interface of the mounter of kg_mcu2 (img_sdc names)
+    input       [7:0] sdc_img_mounted_i,
+    input      [63:0] sdc_img_size_i,
+    output      [7:0] sdc_rd_o,
+    output      [7:0] sdc_wr_o,
+    output     [31:0] sdc_sector_o,
+    input             sdc_busy_i,
+    input             sdc_done_i,
+    input             sdc_error_i,
+    input             sdc_byte_in_strobe_i,
+    input       [8:0] sdc_byte_addr_i,
+    input       [7:0] sdc_byte_in_data_i,
+    output      [7:0] sdc_byte_out_data_o,
 
     // the clock of the board, kg_mcu
     output     [7:0]  rtc_a,
@@ -288,6 +305,7 @@ wire        sdc_busy, sdc_done, sdc_error, sdc_byte_in_strobe;
 wire [8:0]  sdc_byte_addr;
 wire [7:0]  sdc_byte_in_data, sdc_byte_out_data;
 
+generate if (LINK == 1) begin : link1
 img_sdc #(.OUT_LATENCY(4), .TIMEOUT(24'd13000000)) sdc (   // ~200 ms at 65 MHz
     .clk(clk), .reset(~lock),
     .img_mounted(img_mounted), .img_size(img_size),
@@ -301,6 +319,26 @@ img_sdc #(.OUT_LATENCY(4), .TIMEOUT(24'd13000000)) sdc (   // ~200 ms at 65 MHz
     .sdc_byte_in_data(sdc_byte_in_data), .sdc_byte_out_data(sdc_byte_out_data),
     .active()
 );
+    assign sdc_rd_o = 8'd0;
+    assign sdc_wr_o = 8'd0;
+    assign sdc_sector_o = 32'd0;
+    assign sdc_byte_out_data_o = 8'd0;
+end else begin : link2
+    assign sdc_img_mounted = sdc_img_mounted_i;
+    assign sdc_img_size = sdc_img_size_i;
+    assign sdc_busy = sdc_busy_i;
+    assign sdc_done = sdc_done_i;
+    assign sdc_error = sdc_error_i;
+    assign sdc_byte_in_strobe = sdc_byte_in_strobe_i;
+    assign sdc_byte_addr = sdc_byte_addr_i;
+    assign sdc_byte_in_data = sdc_byte_in_data_i;
+    assign sdc_rd_o = sdc_rd;
+    assign sdc_wr_o = sdc_wr;
+    assign sdc_sector_o = sdc_sector;
+    assign sdc_byte_out_data_o = sdc_byte_out_data;
+    assign img_q_wr = 1'b0;
+    assign img_q_di = 24'd0;
+end endgenerate
 
 azctrl ctl (
     .clk(clk), .cold(cold),
